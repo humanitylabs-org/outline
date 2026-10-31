@@ -1,0 +1,66 @@
+/* Minimal notes layout: title, bullets, one quiet toolbar. No separators, no cards. */
+.wz-app{position:relative;max-width:720px;height:100dvh}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+.note-head{flex:none;display:flex;align-items:center;gap:2px;padding:calc(var(--wos-cutout,0px) + 8px) 6px 4px 20px}
+#title{flex:1;width:0;min-height:44px;padding:0;background:none;border:0;outline:none;font-size:22px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+#save{min-height:44px;padding:0 6px;font-size:11px;color:var(--ink-3);white-space:nowrap}
+#save.ok{opacity:0}
+#menu{width:40px;height:40px;border-radius:10px;font-size:15px;letter-spacing:1px;color:var(--ink-3)}
+
+.wz-scroll{padding:8px 16px 48px 10px;scroll-padding-bottom:48px}
+.bullet{display:flex;align-items:flex-start;padding-left:calc(var(--depth)*22px)}
+.dot{position:relative;flex:none;width:26px;height:25.5px;display:grid;place-items:center;touch-action:pan-y}
+.dot::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--ink-3);transition:background .15s,box-shadow .15s}
+.dot::after{content:'';position:absolute;inset:-2px -2px}
+.dot.folded::before{background:var(--ink-2);box-shadow:0 0 0 4px var(--fill-2)}
+.bullet.selected .dot::before{background:var(--ink-2)}
+.live-target .dot::before{background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);animation:live-pulse 1.4s ease-in-out infinite}
+@keyframes live-pulse{50%{box-shadow:0 0 0 7px transparent}}
+.bullet-content{flex:1;min-width:0;padding:0 2px}
+.text{min-height:25.5px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:17px;line-height:1.5;cursor:text;outline:none}
+.text.empty.only:before{content:'Start typing, or tap the mic';color:var(--ink-3)}
+textarea.editor{display:block;width:100%;min-height:25.5px;margin:0;padding:0;resize:none;overflow:hidden;background:none;border:0;outline:none;font-size:17px;line-height:1.5;color:var(--ink);caret-color:var(--accent)}
+
+.draft{font-size:17px;line-height:1.5;color:var(--ink-3);font-style:italic;white-space:pre-wrap}
+.draft small{margin-right:6px;font-size:11px;font-style:normal;color:var(--accent)}
+.draft-actions{display:flex;gap:8px;margin:4px 0 6px;font-style:normal}
+.draft-actions button{min-height:36px;padding:4px 14px;border-radius:var(--r-pill);background:var(--fill);color:var(--ink);font-size:14px}
+.draft-editor{display:block;width:100%;min-height:72px;padding:8px;border:0;border-radius:10px;background:var(--fill);color:var(--ink);font-size:16px}
+
+#notice{position:absolute;z-index:2;left:12px;right:12px;bottom:calc(60px + env(safe-area-inset-bottom));padding:10px 14px;border-radius:12px;background:color-mix(in srgb,var(--canvas) 84%,var(--ink) 16%);color:var(--ink-2);font-size:13px;line-height:1.4}
+#notice:empty{display:none}
+#notice a{display:block;margin-top:6px;color:var(--accent)}
+
+.toolbar{flex:none;display:flex;align-items:center;gap:2px;padding:4px 8px calc(4px + env(safe-area-inset-bottom))}
+.toolbar button{width:48px;height:48px;display:grid;place-items:center;border-radius:12px;color:var(--ink-2)}
+.toolbar svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.toolbar #new{color:var(--ink)}
+#live{width:auto;min-width:56px;margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:8px;border-radius:var(--r-pill)}
+#live[data-state=recording]{background:var(--accent);color:var(--on-accent)}
+#live[data-state=paused],#live[data-state=pending]{background:var(--fill-2);color:var(--ink)}
+#live-status{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+#live-status:empty{display:none}
+button:disabled{opacity:.35;cursor:default}
+@media(hover:hover){button:not(:disabled):hover{background:var(--fill)}#live[data-state=recording]:hover{background:var(--accent)}}
+
+.recording{padding:12px 0;border-top:1px solid var(--line)}
+.recording audio{display:block;width:100%}
+.recording a{display:inline-block;padding:12px 0;color:var(--accent)}
+summary{padding:14px 0;cursor:pointer}
+dialog{width:min(440px,calc(100% - 24px));max-height:85dvh;overflow:auto;padding:20px;background:var(--canvas);color:var(--ink);border:1px solid var(--line-2);border-radius:var(--r)}
+dialog::backdrop{background:var(--fill-2);backdrop-filter:blur(8px)}
+.sheet-head{display:flex;align-items:center;justify-content:space-between}
+.sheet-head h2{font-size:19px}
+.sheet-head button{width:44px;height:44px}
+dialog>button{display:block;width:100%;min-height:48px;text-align:left}
+dialog p{font-size:12px;line-height:1.6;color:var(--ink-3)}
+
+@media(max-width:420px){.bullet{padding-left:calc(var(--depth)*20px)}.note-head{padding-left:16px}.wz-scroll{padding-right:12px;padding-left:8px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.live-target .dot::before{animation:none}}
+.draft small:empty{display:none}
+.text.inline{display:inline;min-height:0}
+.text.inline~.draft{display:inline}
+.text.inline:not(.empty)~.draft{margin-left:.3em}
+.text.inline~.draft .draft-actions,.text.inline~.draft .draft-editor{margin-top:6px}
+.text.inline.empty{display:inline-block;min-width:4px;height:25.5px;vertical-align:top}
