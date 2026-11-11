@@ -8,11 +8,13 @@ import { WebSocketServer } from 'ws';
 import { validateDocument } from './web/model.js';
 import { OutlineRealtime } from './realtime.mjs';
 import { OutlineSharedRealtime, sharedProxyClient } from './shared-realtime.mjs';
+import { handleSwitches } from './switches.mjs';
 import { OutlineLocalRealtime, localEndpoint, localHealth, LOCAL_MODEL } from './local-realtime.mjs';
 import { joinWav } from './audio.mjs';
 
 const root=dirname(fileURLToPath(import.meta.url)), data=resolve(process.env.OUTLINE_DATA || './app-data');
 mkdirSync(data,{recursive:true,mode:0o700});
+process.env.WIZARD_SWITCHES_DIR||=data; // switches.json lives with the outline (wizard.app-switches/1)
 const db=new DatabaseSync(join(data,'outline.sqlite'));
 db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS document (id INTEGER PRIMARY KEY, rev INTEGER NOT NULL, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS audio (take TEXT, seq INTEGER, hash TEXT, bytes BLOB, PRIMARY KEY(take,seq)); CREATE TABLE IF NOT EXISTS speech (id TEXT PRIMARY KEY, target TEXT, seq INTEGER, text TEXT, status TEXT, updated INTEGER);');
 db.exec('CREATE TABLE IF NOT EXISTS audio_take (id TEXT PRIMARY KEY,created INTEGER NOT NULL)');
@@ -37,6 +39,7 @@ if(!local && process.env.TINFOIL_API_KEY && process.env.TINFOIL_PROVIDER_MODULE)
 const server=http.createServer(async(req,res)=>{
  try{
   if(!trusted(req))return json(res,403,{error:'Host or Origin not trusted'});
+  if(await handleSwitches(req,res))return; // wizard.app-switches/1 (Tracker Try it)
   const url=new URL(req.url,'http://localhost'), path=url.pathname;
   if(path==='/healthz')return json(res,200,{ok:true,app:appId,liveReady:local?await localHealth(endpoint):!!provider,model,provider:local?'local-sherpa-cpu':shared?'wizard-shared-tinfoil':'tinfoil',fallback:null,adapterSource:local?process.env.OUTLINE_ADAPTER_SHA||null:null,source:process.env.SOURCE_SHA||null});
   if(path==='/api/config')return json(res,200,{local,shared,appId,model,recovery:trial?'outline-streaming-demo-recovery':'voice-outline-recovery'});
