@@ -5,7 +5,7 @@ renamed_from: [outline-streaming-demo]
 name: Outline
 type: service
 category: app
-version: 0.2.1
+version: 0.2.2
 summary: A minimal notes-style nested outline you can type into or dictate into, with durable recovery.
 license: GPL-3.0-only
 source: https://github.com/humanitylabs-org/outline
@@ -30,6 +30,9 @@ system: false
 uses: []
 needs: [mic]
 health: /healthz
+switches:
+  contract: wizard.app-switches/1
+  path: /api/switches
 ---
 
 # Outline
