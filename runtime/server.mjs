@@ -23,7 +23,13 @@ db.prepare('INSERT OR IGNORE INTO document VALUES(1,0,?)').run(JSON.stringify(in
 const getDoc=()=>{const row=db.prepare('SELECT * FROM document WHERE id=1').get();return {rev:row.rev,document:JSON.parse(row.body)};};
 const hosts=new Set((process.env.WIZARD_TRUSTED_HOSTS||'localhost,127.0.0.1,[::1]').split(','));
 const origins=new Set((process.env.WIZARD_TRUSTED_ORIGINS||'').split(',').filter(Boolean));
-function trusted(req){let u;try{u=new URL('http://'+req.headers.host);}catch{return false;}if(!hosts.has(u.hostname))return false;return !req.headers.origin || req.headers.origin===`http://${req.headers.host}` || origins.has(req.headers.origin);}
+function hostTrusted(req){let u;try{u=new URL('http://'+req.headers.host);}catch{return false;}return hosts.has(u.hostname);}
+function trusted(req){if(!hostTrusted(req))return false;return !req.headers.origin || req.headers.origin===`http://${req.headers.host}` || origins.has(req.headers.origin);}
+// wizard-os issue 133 (browser boundary): a sandboxed Wizard window is an opaque origin, so the browser asks for the
+// module script (app.js, model.js) and its other files with `Origin: null` and needs a CORS answer. Only GET/HEAD of
+// one public file directly in web/ (never the page, the API, MCP, switches or a write); no credentials ride along.
+const OPAQUE_ASSET=/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.(?:js|mjs|css|svg|png|webp|woff2?)$/;
+function opaqueAsset(req){if(req.headers.origin!=='null'||!['GET','HEAD'].includes(req.method)||!hostTrusted(req))return false;let path;try{path=new URL(req.url,'http://localhost').pathname;}catch{return false;}return OPAQUE_ASSET.test(path);}
 function json(res,code,value){res.writeHead(code,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(value));}
 async function body(req,limit=2e6){const parts=[];let bytes=0;for await(const b of req){bytes+=b.length;if(bytes>limit)throw Object.assign(new Error('Request too large'),{status:413});parts.push(b);}return Buffer.concat(parts);}
 function putDoc(payload){validateDocument(payload.document);const old=getDoc();if(payload.rev!==old.rev)return {conflict:true,...old};db.prepare('UPDATE document SET rev=?,body=? WHERE id=1').run(old.rev+1,JSON.stringify(payload.document));return getDoc();}
@@ -38,7 +44,8 @@ let provider=local?{local:true}:null;
 if(!local && process.env.TINFOIL_API_KEY && process.env.TINFOIL_PROVIDER_MODULE){const {TinfoilProvider}=await import(pathToFileURL(resolve(process.env.TINFOIL_PROVIDER_MODULE)));const client=shared?sharedProxyClient(resolve(process.env.TINFOIL_PROVIDER_MODULE),process.env.TINFOIL_API_KEY,process.env.WIZARD_VOICE_PROXY_URL):null;provider=new TinfoilProvider(process.env.TINFOIL_API_KEY,client,'voxtral-mini-4b-realtime');}
 const server=http.createServer(async(req,res)=>{
  try{
-  if(!trusted(req))return json(res,403,{error:'Host or Origin not trusted'});
+  const opaque=opaqueAsset(req);
+  if(!opaque&&!trusted(req))return json(res,403,{error:'Host or Origin not trusted'});
   if(await handleSwitches(req,res))return; // wizard.app-switches/1 (Tracker Try it)
   const url=new URL(req.url,'http://localhost'), path=url.pathname;
   if(path==='/healthz')return json(res,200,{ok:true,app:appId,liveReady:local?await localHealth(endpoint):!!provider,model,provider:local?'local-sherpa-cpu':shared?'wizard-shared-tinfoil':'tinfoil',fallback:null,adapterSource:local?process.env.OUTLINE_ADAPTER_SHA||null:null,source:process.env.SOURCE_SHA||null});
@@ -91,7 +98,7 @@ const server=http.createServer(async(req,res)=>{
    if(!file.startsWith(resolve(root,'web')+'/'))return json(res,403,{error:'Forbidden'});
   }
   if(!existsSync(file))return json(res,404,{error:'Not found'});
-  res.writeHead(200,{'content-type':({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml'})[extname(file)]||'application/octet-stream','cache-control':'no-cache','x-content-type-options':'nosniff','referrer-policy':'same-origin'});const content=readFileSync(file);res.end(trial&&file.endsWith('/index.html')?content.toString().replace('data-app="voice-outline"','data-app="outline-streaming-demo"'):content);
+  res.writeHead(200,{...(opaque?{'access-control-allow-origin':'*'}:{}),'content-type':({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml'})[extname(file)]||'application/octet-stream','cache-control':'no-cache','x-content-type-options':'nosniff','referrer-policy':'same-origin'});const content=readFileSync(file);res.end(trial&&file.endsWith('/index.html')?content.toString().replace('data-app="voice-outline"','data-app="outline-streaming-demo"'):content);
  }catch(e){json(res,e.status||400,{error:e.message});}
 });
 const wss=new WebSocketServer({noServer:true,maxPayload:100000});let sockets=0,localTail=Promise.resolve();
